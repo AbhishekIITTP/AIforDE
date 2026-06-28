@@ -1,0 +1,38 @@
+name: AI News Agent
+
+on:
+  schedule:
+    # Runs every 6 hours (UTC). Adjust as you like.
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}   # lets you run it manually from the Actions tab
+
+permissions:
+  contents: write          # needed to commit the updated seen.json
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run agent
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          MAX_POSTS_PER_RUN: ${{ secrets.MAX_POSTS_PER_RUN }}
+        run: python main.py
+
+      - name: Persist de-duplication state
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update seen state [skip ci]"
+          file_pattern: data/seen.json
