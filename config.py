@@ -23,7 +23,7 @@ def _env(name: str, default: str = "") -> str:
 
 # ----- Groq (free LLM inference) -----
 GROQ_API_KEY = _env("GROQ_API_KEY")
-GROQ_MODEL = _env("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = _env("GROQ_MODEL", "llama-3.1-8b-instant")
 
 # ----- Telegram -----
 TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN")
