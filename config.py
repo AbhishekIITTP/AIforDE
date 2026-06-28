@@ -10,16 +10,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _env(name: str, default: str = "") -> str:
+    """Return an env var, treating empty/whitespace values as unset.
+
+    GitHub Actions passes unset secrets as empty strings, so we fall back
+    to the default instead of breaking on blank values.
+    """
+    value = os.getenv(name)
+    return value.strip() if value and value.strip() else default
+
+
 # ----- Groq (free LLM inference) -----
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = _env("GROQ_API_KEY")
+GROQ_MODEL = _env("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 # ----- Telegram -----
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "")
+TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHANNEL_ID = _env("TELEGRAM_CHANNEL_ID")
 
 # ----- Behaviour -----
-MAX_POSTS_PER_RUN = int(os.getenv("MAX_POSTS_PER_RUN", "5"))
+MAX_POSTS_PER_RUN = int(_env("MAX_POSTS_PER_RUN", "3"))
 
 # RSS / Atom sources. All free, no API key required.
 # Add or remove freely — the agent filters them by KEYWORDS below.
