@@ -1,11 +1,28 @@
 """Turn a raw news item into a short, teaching-style Telegram post via Groq."""
 
+import re
+import time
+
 import requests
 
 from config import GROQ_API_KEY, GROQ_MODEL
 from src.article import fetch_article_text
 
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+def _retry_after_seconds(resp: requests.Response) -> float:
+    """Seconds to wait after a 429, from headers or the error message."""
+    header = resp.headers.get("retry-after")
+    if header:
+        try:
+            return min(float(header), 30.0)
+        except ValueError:
+            pass
+    match = re.search(r"try again in ([\d.]+)s", resp.text)
+    if match:
+        return min(float(match.group(1)) + 0.5, 30.0)
+    return 5.0
 
 _SYSTEM_PROMPT = (
     "You are an expert AI/ML educator writing for data engineers and builders. "
@@ -66,42 +83,52 @@ def summarize(item: dict) -> str | None:
     article = fetch_article_text(item["link"])
     content = article if len(article) > len(item["summary"]) else item["summary"]
 
+    # Keep content modest so we stay well under Groq's free-tier TPM limit.
     user_content = (
         f"Title: {item['title']}\n\n"
         f"Source: {item['source']}\n\n"
-        f"Content: {content[:3500]}"
+        f"Content: {content[:1800]}"
     )
 
-    try:
-        resp = requests.post(
-            _GROQ_URL,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": GROQ_MODEL,
-                "temperature": 0.5,
-                "max_tokens": 320,
-                "messages": [
-                    {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": user_content},
-                ],
-            },
-            timeout=60,
-        )
-    except requests.RequestException as exc:
-        print(f"[summarizer] request failed: {exc}")
-        return None
+    payload = {
+        "model": GROQ_MODEL,
+        "temperature": 0.5,
+        "max_tokens": 300,
+        "messages": [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
-    if resp.status_code != 200:
-        print(f"[summarizer] Groq error {resp.status_code}: {resp.text[:300]}")
-        return None
+    # Retry a few times on rate limits (HTTP 429), honoring the suggested wait.
+    for attempt in range(3):
+        try:
+            resp = requests.post(_GROQ_URL, headers=headers, json=payload, timeout=60)
+        except requests.RequestException as exc:
+            print(f"[summarizer] request failed: {exc}")
+            return None
 
-    try:
-        body = resp.json()["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, ValueError) as exc:
-        print(f"[summarizer] unexpected response: {exc}")
-        return None
+        if resp.status_code == 429:
+            wait = _retry_after_seconds(resp)
+            print(f"[summarizer] rate limited; waiting {wait:.1f}s (attempt {attempt + 1}/3)")
+            time.sleep(wait)
+            continue
 
-    return body or None
+        if resp.status_code != 200:
+            print(f"[summarizer] Groq error {resp.status_code}: {resp.text[:300]}")
+            return None
+
+        try:
+            body = resp.json()["choices"][0]["message"]["content"].strip()
+        except (KeyError, IndexError, ValueError) as exc:
+            print(f"[summarizer] unexpected response: {exc}")
+            return None
+
+        return body or None
+
+    print("[summarizer] giving up after repeated rate limits.")
+    return None

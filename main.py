@@ -20,11 +20,17 @@ def run() -> None:
 
     print(f"[main] {len(items)} relevant items fetched, {len(new_items)} new.")
 
+    # Cap how many items we even try, so a string of failures (rate limits,
+    # unfetchable pages) can never turn into hundreds of API calls.
+    max_attempts = MAX_POSTS_PER_RUN * 4
+
     posted = 0
+    attempts = 0
     for item in new_items:
-        if posted >= MAX_POSTS_PER_RUN:
+        if posted >= MAX_POSTS_PER_RUN or attempts >= max_attempts:
             break
 
+        attempts += 1
         body = summarize(item)
         if not body:
             continue
@@ -33,12 +39,14 @@ def run() -> None:
             seen.add(item["id"])
             posted += 1
             print(f"[main] posted: {item['title'][:70]}")
-            time.sleep(3)  # gentle pacing to respect Telegram rate limits
         else:
             print(f"[main] skipped (publish failed): {item['title'][:70]}")
 
+        # Pace requests to stay under Telegram + Groq free-tier rate limits.
+        time.sleep(5)
+
     save_seen(seen)
-    print(f"[main] done. {posted} new post(s) published.")
+    print(f"[main] done. {posted} new post(s) published, {attempts} attempt(s).")
 
 
 if __name__ == "__main__":
