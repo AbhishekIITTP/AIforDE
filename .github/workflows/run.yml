@@ -2,8 +2,9 @@ name: AI News Agent
 
 on:
   schedule:
-    # Runs every 6 hours (UTC). Adjust as you like.
-    - cron: "0 */6 * * *"
+    # Every 6 hours (UTC). Minute :23 avoids the congested top-of-hour queue,
+    # so GitHub's best-effort scheduler runs it more punctually.
+    - cron: "23 */6 * * *"
   workflow_dispatch: {}   # lets you run it manually from the Actions tab
 
 permissions:
