@@ -65,7 +65,7 @@ def _fallback_post(item: dict) -> str:
             lines.append(f"• {s.rstrip('.')}")
 
     lines.append("\n🛠 For data engineers: a fresh AI/ML update worth a look.")
-    lines.append("📚 Tip: add a Groq key in .env for full teaching summaries.")
+    lines.append("📚 Learn: open the link for the full details.")
     return "\n".join(lines)
 
 
@@ -105,12 +105,14 @@ def summarize(item: dict) -> str | None:
     }
 
     # Retry a few times on rate limits (HTTP 429), honoring the suggested wait.
+    # On any Groq failure we fall back to a feed-based post rather than dropping
+    # the item, so a throttled LLM never turns into a run that posts nothing.
     for attempt in range(3):
         try:
             resp = requests.post(_GROQ_URL, headers=headers, json=payload, timeout=60)
         except requests.RequestException as exc:
-            print(f"[summarizer] request failed: {exc}")
-            return None
+            print(f"[summarizer] request failed: {exc} — using fallback.")
+            return _fallback_post(item)
 
         if resp.status_code == 429:
             wait = _retry_after_seconds(resp)
@@ -119,16 +121,16 @@ def summarize(item: dict) -> str | None:
             continue
 
         if resp.status_code != 200:
-            print(f"[summarizer] Groq error {resp.status_code}: {resp.text[:300]}")
-            return None
+            print(f"[summarizer] Groq error {resp.status_code}: {resp.text[:300]} — using fallback.")
+            return _fallback_post(item)
 
         try:
             body = resp.json()["choices"][0]["message"]["content"].strip()
         except (KeyError, IndexError, ValueError) as exc:
-            print(f"[summarizer] unexpected response: {exc}")
-            return None
+            print(f"[summarizer] unexpected response: {exc} — using fallback.")
+            return _fallback_post(item)
 
-        return body or None
+        return body or _fallback_post(item)
 
-    print("[summarizer] giving up after repeated rate limits.")
-    return None
+    print("[summarizer] repeated rate limits — using fallback post.")
+    return _fallback_post(item)

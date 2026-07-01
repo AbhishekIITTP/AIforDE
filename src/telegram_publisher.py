@@ -51,3 +51,31 @@ def publish(body: str, link: str | None = None) -> bool:
         return False
 
     return True
+
+
+def publish_status(text: str) -> bool:
+    """Send a plain status/heartbeat message (no formatting). Returns True on success."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHANNEL_ID:
+        print("[telegram] bot token or channel id is not set.")
+        return False
+
+    try:
+        resp = requests.post(
+            _API.format(token=TELEGRAM_BOT_TOKEN),
+            json={
+                "chat_id": TELEGRAM_CHANNEL_ID,
+                "text": text[:_MAX_LEN],
+                "disable_web_page_preview": True,
+                "disable_notification": True,
+            },
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        print(f"[telegram] status request failed: {exc}")
+        return False
+
+    if resp.status_code != 200:
+        print(f"[telegram] status error {resp.status_code}: {resp.text[:300]}")
+        return False
+
+    return True

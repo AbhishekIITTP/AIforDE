@@ -30,6 +30,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
           MAX_POSTS_PER_RUN: ${{ secrets.MAX_POSTS_PER_RUN }}
+          HEARTBEAT: ${{ secrets.HEARTBEAT }}
         run: python main.py
 
       - name: Persist de-duplication state

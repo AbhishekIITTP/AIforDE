@@ -32,6 +32,11 @@ TELEGRAM_CHANNEL_ID = _env("TELEGRAM_CHANNEL_ID")
 # ----- Behaviour -----
 MAX_POSTS_PER_RUN = int(_env("MAX_POSTS_PER_RUN", "3"))
 
+# Send a short status message to the channel at the end of every run, even
+# when nothing new was posted. Makes scheduled runs observable. Set to "0"
+# to disable.
+HEARTBEAT = _env("HEARTBEAT", "1") == "1"
+
 # RSS / Atom sources. All free, no API key required.
 # Add or remove freely — the agent filters them by KEYWORDS below.
 FEEDS = [
